@@ -22,6 +22,7 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import org.json.*;
 
 /**
@@ -79,8 +80,6 @@ public class Crawler {
 
         int urls_ammount = urls.size() - start;
         long startTime = System.nanoTime();
-        String lastAbilityUsed = "";
-        String lastNatureUsed = "";
         for (int a = start; a < urls_ammount; a++) {
             long passedTime = System.nanoTime() - startTime;
             long averageTime = passedTime / Math.max(a, 1);
@@ -132,122 +131,191 @@ public class Crawler {
                 if (ok) {
                     for (int j = 0; j < moveset.length(); j++) {
                         //Convert to smogon importable set
+                        // Init setdata map
+                        HashMap<String, ArrayList<String>> setdata = new HashMap<>();
+
                         //Name
-                        String setdata = urls.get(a)[1];
+                        ArrayList<String> name = new ArrayList<>();
+                        name.add(urls.get(a)[1]);
+                        setdata.put("name", name);
 
                         //Item
                         if (!moveset.getJSONObject(j).getJSONArray("items").isNull(0)) {
-                            setdata += " @ " + moveset.getJSONObject(j).getJSONArray("items").getString(0);
+                            ArrayList<String> items = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("items").length(); k++) {
+                                items.add(moveset.getJSONObject(j).getJSONArray("items").getString(k));
+                            }
+                            setdata.put("items", items);
                         }
-                        setdata += System.lineSeparator();
 
                         //Level
                         if (format_name.equals("LC")) {
-                            setdata += "Level: 5" + System.lineSeparator();
+                            ArrayList<String> level = new ArrayList<>();
+                            level.add("5");
+                            setdata.put("level", level);
                         }
 
                         //Ability
                         if (!moveset.getJSONObject(j).getJSONArray("abilities").isNull(0)) {
-                            setdata += "Ability: " + moveset.getJSONObject(j).getJSONArray("abilities").getString(0) + System.lineSeparator();
-                            lastAbilityUsed = moveset.getJSONObject(j).getJSONArray("abilities").getString(0);
+                            ArrayList<String> abilities = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("abilities").length(); k++) {
+                                abilities.add(moveset.getJSONObject(j).getJSONArray("abilities").getString(k));
+                            }
+                            setdata.put("abilities", abilities);
                         } else {
-                            if (!urls.get(a)[2].equals("RB") && !urls.get(a)[2].equals("GS") && !lastAbilityUsed.equals("")) {
-                                setdata += "Ability: " + lastAbilityUsed + System.lineSeparator();
+                            if (!urls.get(a)[2].equals("RB") && !urls.get(a)[2].equals("GS")) {
+                                // Find another moveset with abilities
+                                int biggestSetIndex = -1;
+                                int biggestSetSize = 0;
+                                for (int k = 0; k < moveset.length(); k++) {
+                                    if (moveset.getJSONObject(k).getJSONArray("abilities").length() > biggestSetSize) {
+                                        biggestSetIndex = k;
+                                        biggestSetSize = moveset.getJSONObject(k).getJSONArray("abilities").length();
+                                    }
+                                }
+                                if (biggestSetIndex > -1) {
+                                    ArrayList<String> abilities = new ArrayList<>();
+                                    for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("abilities").length(); k++) {
+                                        abilities.add(moveset.getJSONObject(j).getJSONArray("abilities").getString(k));
+                                    }
+                                    setdata.put("abilities", abilities);
+                                }
                             }
                         }
 
                         //EVs
                         if (!moveset.getJSONObject(j).getJSONArray("evconfigs").isNull(0)) {
-                            ArrayList<String> evs = new ArrayList<>();
-                            if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("hp") > 0) {
-                                evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("hp") + " HP");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("atk") > 0) {
-                                evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("atk") + " Atk");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("def") > 0) {
-                                evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("def") + " Def");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spa") > 0) {
-                                evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spa") + " SpA");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spd") > 0) {
-                                evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spd") + " SpD");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spe") > 0) {
-                                evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spe") + " Spe");
-                            }
-
-                            do {
-                            } while (!fillEvs(evs));
-
-                            setdata += "EVs: ";
-                            for (int k = 0; k < evs.size(); k++) {
-                                setdata += evs.get(k);
-                                if (k < evs.size() - 1) {
-                                    setdata += " / ";
-                                } else {
-                                    setdata += System.lineSeparator();
+                            ArrayList<String> evsList = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("evconfigs").length(); k++) {
+                                ArrayList<String> evs = new ArrayList<>();
+                                if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("hp") > 0) {
+                                    evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("hp") + " HP");
                                 }
+                                if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("atk") > 0) {
+                                    evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("atk") + " Atk");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("def") > 0) {
+                                    evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("def") + " Def");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spa") > 0) {
+                                    evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spa") + " SpA");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spd") > 0) {
+                                    evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spd") + " SpD");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spe") > 0) {
+                                    evs.add(moveset.getJSONObject(j).getJSONArray("evconfigs").getJSONObject(0).getInt("spe") + " Spe");
+                                }
+
+                                do {
+                                } while (!fillEvs(evs));
+
+                                String evString = "";
+                                for (int l = 0; l < evs.size(); l++) {
+                                    evString += evs.get(l);
+                                    if (l < evs.size() - 1) {
+                                        evString += " / ";
+                                    } else {
+                                        // Finished
+                                        evsList.add(evString);
+                                    }
+                                }
+                                evs.clear();
                             }
-                            evs.clear();
+                            setdata.put("evs", evsList);
                         }
 
                         //IVs
                         if (!moveset.getJSONObject(j).getJSONArray("ivconfigs").isNull(0)) {
-                            ArrayList<String> ivs = new ArrayList<>();
-                            if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("hp")) {
-                                ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("hp") + " HP");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("atk")) {
-                                ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("atk") + " Atk");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("def")) {
-                                ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("def") + " Def");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("spa")) {
-                                ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("spa") + " SpA");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("spd")) {
-                                ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("spd") + " SpD");
-                            }
-                            if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("spe")) {
-                                ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("spe") + " Spe");
-                            }
-                            if (!ivs.isEmpty()) {
-                                setdata += "IVs: ";
-                                for (int k = 0; k < ivs.size(); k++) {
-                                    setdata += ivs.get(k);
-                                    if (k < ivs.size() - 1) {
-                                        setdata += " / ";
-                                    } else {
-                                        setdata += System.lineSeparator();
+                            ArrayList<String> ivsList = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("ivconfigs").length(); k++) {
+                                ArrayList<String> ivs = new ArrayList<>();
+                                if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("hp")) {
+                                    ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("hp") + " HP");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("atk")) {
+                                    ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("atk") + " Atk");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("def")) {
+                                    ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("def") + " Def");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("spa")) {
+                                    ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("spa") + " SpA");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("spd")) {
+                                    ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("spd") + " SpD");
+                                }
+                                if (moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).has("spe")) {
+                                    ivs.add(moveset.getJSONObject(j).getJSONArray("ivconfigs").getJSONObject(0).getInt("spe") + " Spe");
+                                }
+                                if (!ivs.isEmpty()) {
+                                    String ivString = "";
+                                    for (int l = 0; l < ivs.size(); l++) {
+                                        ivString += ivs.get(l);
+                                        if (l < ivs.size() - 1) {
+                                            ivString += " / ";
+                                        } else {
+                                            // Finished
+                                            ivsList.add(ivString);
+                                        }
                                     }
                                 }
+                                ivs.clear();
                             }
-                            ivs.clear();
+                            setdata.put("ivs", ivsList);
                         }
 
                         //Nature
                         if (!moveset.getJSONObject(j).getJSONArray("natures").isNull(0)) {
-                            setdata += moveset.getJSONObject(j).getJSONArray("natures").getString(0) + " Nature" + System.lineSeparator();
-                            lastNatureUsed = moveset.getJSONObject(j).getJSONArray("natures").getString(0);
+                            ArrayList<String> natures = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("natures").length(); k++) {
+                                natures.add(moveset.getJSONObject(j).getJSONArray("natures").getString(k));
+                            }
+                            setdata.put("natures", natures);
                         } else {
-                            if (!urls.get(a)[2].equals("RB") && !urls.get(a)[2].equals("GS") && !lastNatureUsed.equals("")) {
-                                setdata += lastNatureUsed + " Nature" + System.lineSeparator();
+                            if (!urls.get(a)[2].equals("RB") && !urls.get(a)[2].equals("GS")) {
+                                // Find other movesets with abilities
+                                ArrayList<String> natures = new ArrayList<>();
+                                for (int k = 0; k < moveset.length(); k++) {
+                                    for (int l = 0; l < moveset.getJSONObject(k).getJSONArray("natures").length(); l++) {
+                                        if (!natures.contains(moveset.getJSONObject(k).getJSONArray("natures").getString(l))) {
+                                            natures.add(moveset.getJSONObject(k).getJSONArray("natures").getString(l));
+                                        }
+                                    }
+                                }
+                                if (natures.isEmpty()) {
+                                    natures.add("Hardy");
+                                }
+                                setdata.put("natures", natures);
                             }
                         }
 
                         //Moves
-                        setdata += "- " + moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(0).getString(0) + System.lineSeparator();
+                        ArrayList<String> moves1 = new ArrayList<>();
+                        for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(0).length(); k++) {
+                            moves1.add(moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(0).getString(k));
+                        }
+                        setdata.put("moves1", moves1);
                         if (!moveset.getJSONObject(j).getJSONArray("moveslots").isNull(1)) {
-                            setdata += "- " + moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(1).getString(0) + System.lineSeparator();
+                            ArrayList<String> moves2 = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(1).length(); k++) {
+                                moves2.add(moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(1).getString(k));
+                            }
+                            setdata.put("moves2", moves2);
                         }
                         if (!moveset.getJSONObject(j).getJSONArray("moveslots").isNull(2)) {
-                            setdata += "- " + moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(2).getString(0) + System.lineSeparator();
+                            ArrayList<String> moves3 = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(2).length(); k++) {
+                                moves3.add(moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(2).getString(k));
+                            }
+                            setdata.put("moves3", moves3);
                         }
                         if (!moveset.getJSONObject(j).getJSONArray("moveslots").isNull(3)) {
-                            setdata += "- " + moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(3).getString(0) + System.lineSeparator();
+                            ArrayList<String> moves4 = new ArrayList<>();
+                            for (int k = 0; k < moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(3).length(); k++) {
+                                moves4.add(moveset.getJSONObject(j).getJSONArray("moveslots").getJSONArray(3).getString(k));
+                            }
+                            setdata.put("moves4", moves4);
                         }
 
                         try {
@@ -454,12 +522,103 @@ public class Crawler {
         }
     }
 
-    private void keepSet(String setdata, String generation, String format, ArrayList<String> sets, ArrayList<String> db) throws IOException {
-        if (!db.contains(bin2hex(getHash(generation + System.lineSeparator() + setdata)))) {
-            writeSetToFile(setdata, generation, format);
-            sets.add(setdata);
-            addToDatabase(setdata, generation, format, db);
-            System.out.println(setdata);
+    private void keepSet(HashMap<String, ArrayList<String>> setdata, String generation, String format, ArrayList<String> sets, ArrayList<String> db) throws IOException {
+        int[] counters = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+        String[] counterNames = {"items", "abilities", "evs", "ivs", "natures", "moves1", "moves2", "moves3", "moves4"};
+        boolean finished_all = false;
+        do {
+            // Check if valid moves
+            boolean ok = true;
+            ArrayList<String> moves = new ArrayList<>();
+            ArrayList<String> moves1 = setdata.getOrDefault("moves1", new ArrayList<>());
+            ArrayList<String> moves2 = setdata.getOrDefault("moves2", new ArrayList<>());
+            ArrayList<String> moves3 = setdata.getOrDefault("moves3", new ArrayList<>());
+            ArrayList<String> moves4 = setdata.getOrDefault("moves4", new ArrayList<>());
+            if (moves1.size() - 1 >= counters[5]) {
+                moves.add(moves1.get(counters[5]));
+            }
+            if (moves2.size() - 1 >= counters[5]) {
+                moves.add(moves2.get(counters[5]));
+            }
+            if (moves3.size() - 1 >= counters[5]) {
+                moves.add(moves3.get(counters[5]));
+            }
+            if (moves4.size() - 1 >= counters[5]) {
+                moves.add(moves4.get(counters[5]));
+            }
+            for (int i = 0; i < moves.size(); i++) {
+                for (int j = 0; j < moves.size(); j++) {
+                    if (i != j) {
+                        ok = ok && !moves.get(i).equals(moves.get(j));
+                    }
+                }
+            }
+
+            if (ok) {
+                String setdataString = getSetdataString(setdata, counters);
+                if (!db.contains(bin2hex(getHash(generation + System.lineSeparator() + setdataString)))) {
+                    writeSetToFile(setdataString, generation, format);
+                    sets.add(setdataString);
+                    addToDatabase(setdataString, generation, format, db);
+                    System.out.println(setdataString);
+                }
+            }
+
+            // Increment
+            finished_all = true;
+            for (int i = 0; i < counters.length; i++) {
+                ArrayList<String> list = setdata.getOrDefault(counterNames[i], new ArrayList<>());
+                if (list.size() - 1 >= counters[i] + 1) {
+                    counters[i]++;
+                    finished_all = false;
+                    break;
+                } else {
+                    counters[i] = 0;
+                }
+            }
+        } while (!finished_all);
+    }
+
+    private String getSetdataString(HashMap<String, ArrayList<String>> setdata, int[] counters) {
+        ArrayList<String> name = setdata.getOrDefault("name", new ArrayList<>());
+        String set = name.get(0);
+        ArrayList<String> items = setdata.getOrDefault("items", new ArrayList<>());
+        if (items.size() - 1 >= counters[0]) {
+            set += " @ " + items.get(counters[0]);
         }
+        set += System.lineSeparator();
+        ArrayList<String> abilities = setdata.getOrDefault("abilities", new ArrayList<>());
+        if (abilities.size() - 1 >= counters[1]) {
+            set += "Ability: " + abilities.get(counters[1]) + System.lineSeparator();
+        }
+        ArrayList<String> evs = setdata.getOrDefault("evs", new ArrayList<>());
+        if (evs.size() - 1 >= counters[2]) {
+            set += "EVs: " + evs.get(counters[2]) + System.lineSeparator();
+        }
+        ArrayList<String> ivs = setdata.getOrDefault("ivs", new ArrayList<>());
+        if (ivs.size() - 1 >= counters[3]) {
+            set += "IVs: " + ivs.get(counters[3]) + System.lineSeparator();
+        }
+        ArrayList<String> natures = setdata.getOrDefault("natures", new ArrayList<>());
+        if (natures.size() - 1 >= counters[4]) {
+            set += natures.get(counters[4]) + " Nature" + System.lineSeparator();
+        }
+        ArrayList<String> moves1 = setdata.getOrDefault("moves1", new ArrayList<>());
+        if (moves1.size() - 1 >= counters[5]) {
+            set += "- " + moves1.get(counters[5]) + System.lineSeparator();
+        }
+        ArrayList<String> moves2 = setdata.getOrDefault("moves2", new ArrayList<>());
+        if (moves2.size() - 1 >= counters[6]) {
+            set += "- " + moves2.get(counters[6]) + System.lineSeparator();
+        }
+        ArrayList<String> moves3 = setdata.getOrDefault("moves3", new ArrayList<>());
+        if (moves3.size() - 1 >= counters[7]) {
+            set += "- " + moves3.get(counters[7]) + System.lineSeparator();
+        }
+        ArrayList<String> moves4 = setdata.getOrDefault("moves4", new ArrayList<>());
+        if (moves4.size() - 1 >= counters[8]) {
+            set += "- " + moves4.get(counters[8]) + System.lineSeparator();
+        }
+        return set;
     }
 }
